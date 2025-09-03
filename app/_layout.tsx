@@ -1,13 +1,11 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import Auth from '@/components/Auth';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
+import '../global.css';
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
@@ -18,12 +16,24 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <AuthProvider>
+      <InnerLayout />
+    </AuthProvider>
   );
+}
+
+function InnerLayout() {
+  const { user, loading } = useAuth()
+
+  if (loading) return null
+
+  // If there's no authenticated user, show the Auth UI instead of app tabs.
+  if (!user) return <Auth />
+
+  return (
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="+not-found" />
+    </Stack>
+  )
 }
