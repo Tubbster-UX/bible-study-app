@@ -1,7 +1,12 @@
-import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/utils/supabase'
-import { useEffect, useRef, useState } from 'react'
-import { FlatList, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, Text, TextInput, View } from 'react-native'
+import { MessageInput } from '@/components/MessageInput';
+import { MessageList } from '@/components/MessageList';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/utils/supabase';
+import { useHeaderHeight } from "@react-navigation/elements"; // if using React Navigation
+import { useEffect, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+
 
 type Message = {
   id: number
@@ -20,6 +25,13 @@ export default function ChatScreen() {
   const broadcastChannelRef = useRef<any | null>(null)
   // Hardcoded group id to send messages to and listen for
   const GROUP_ID = '8ba140c1-b57f-4967-b2a9-c2812bab8a72'
+  const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight?.() ?? 0; // 0 if not using RN Navigation
+
+  const kbo = Platform.select({
+    ios: headerHeight,                         // iOS: account for header
+    android: 0,
+  }) + insets.bottom;                          // also account for bottom inset (home indicator)
 
   useEffect(() => {
     let mounted = true
@@ -40,8 +52,7 @@ export default function ChatScreen() {
       // set last seen to newest message timestamp
       if (data && data.length) lastSeenRef.current = data[data.length - 1].created_at
       else lastSeenRef.current = new Date().toISOString()
-      // scroll to bottom after initial load
-      setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 100)
+  // removed scrollToEnd from here
     }
 
     load()
@@ -166,6 +177,15 @@ export default function ChatScreen() {
       }
     }
   }, [])
+  
+  // Always scroll to bottom when messages change
+  useEffect(() => {
+    if (flatRef.current && messages.length > 0) {
+      setTimeout(() => {
+        flatRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    }
+  }, [messages]);
 
   async function sendMessage() {
     if (!user || !text.trim()) return
@@ -201,39 +221,21 @@ export default function ChatScreen() {
   }
   }
 
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} // or 'padding' for Android if 'resize' is handled externally
-      className='flex-1'
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} // Adjust offset for iOS if needed
-    >
-      <SafeAreaView className="flex-1 p-3">
-        <FlatList
-          ref={flatRef}
-          data={messages}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
-            <View className={`py-2 ${item.author_id === user?.id ? 'items-end' : 'items-start'}`}>
-              <View className={`max-w-3/4 px-3 py-2 rounded ${item.author_id === user?.id ? 'bg-blue-600' : 'bg-gray-200'}`}>
-                <Text className={`${item.author_id === user?.id ? 'text-white' : 'text-black'}`}>{item.body}</Text>
-                <Text className="text-xs text-gray-500 mt-1">{new Date(item.created_at).toLocaleTimeString()}</Text>
-              </View>
-            </View>
-          )}
-        />
 
-        <View className="flex-row items-center mt-4">
-          <TextInput
-            value={text}
-            onChangeText={setText}
-            placeholder="Type a message"
-            className="flex-1 border border-gray-300 rounded px-3 py-2 mr-2"
-          />
-          <Pressable onPress={sendMessage} className="bg-blue-600 px-4 py-2 rounded">
-            <Text className="text-white">Send</Text>
-          </Pressable>
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={kbo}
+      >
+        <View style={{ flex: 1 }}>
+          <MessageList messages={messages} userId={user?.id} flatRef={flatRef} />
         </View>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
-  )
+
+        {/* Keep the input in normal flow (not absolute) */}
+        <MessageInput text={text} setText={setText} onSend={sendMessage} />
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
 }
